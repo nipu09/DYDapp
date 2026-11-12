@@ -14,10 +14,11 @@ const userSchema = new Schema(
 
     email: {
       type: String,
-      required: true,
+      required: [true, "Email is required"],
       unique: true,
       lowercase: true,
       trim: true,
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Please enter a valid email"],
     },
 
     fullName: {
@@ -70,7 +71,7 @@ const userSchema = new Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Unique phone number only when provided
@@ -81,7 +82,7 @@ userSchema.index(
     partialFilterExpression: {
       phoneNumber: { $type: "string" },
     },
-  }
+  },
 );
 
 // Password hashing middleware
@@ -108,7 +109,7 @@ userSchema.methods.generateAccessToken = function () {
     process.env.ACCESS_TOKEN_SECRET,
     {
       expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
-    }
+    },
   );
 };
 
@@ -121,7 +122,7 @@ userSchema.methods.generateRefreshToken = function () {
     process.env.REFRESH_TOKEN_SECRET,
     {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
-    }
+    },
   );
 };
 
