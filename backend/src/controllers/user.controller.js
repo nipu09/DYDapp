@@ -16,40 +16,47 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All required fields are required");
   }
 
-  // 2. Check existing user
-  const existingUser = await User.findOne({
-    $or: [{ username }, { email }],
-  });
+  // 2. Check if email already exists
+  const existingEmail = await User.findOne({ email });
 
-  if (existingUser) {
-    throw new ApiError(409, "User already registered with username or email");
+  if (existingEmail) {
+    throw new ApiError(409, "Email is already registered");
   }
 
-//   // 3. Get avatar local path
-//   const avatarLocalPath = req.file?.path;
+  // 3. Check if username already exists
+  const existingUsername = await User.findOne({ username });
 
-//   if (!avatarLocalPath) {
-//     throw new ApiError(400, "Avatar is required");
-//   }
+  if (existingUsername) {
+    throw new ApiError(409, "Username is already taken");
+  }
 
-//   // 4. Upload avatar to Cloudinary
-//   const avatar = await uploadOnCloudinary(avatarLocalPath);
+  // 4. Get avatar local path
+  const avatarLocalPath = req.file?.path;
 
-//   if (!avatar) {
-//     throw new ApiError(400, "Avatar upload failed, something went wrong");
-//   }
+  // 5. Upload avatar only if provided
+  let avatarUrl = null;
 
-  // 5. Create user
+  if (avatarLocalPath) {
+    const avatar = await uploadOnCloudinary(avatarLocalPath);
+
+    if (!avatar) {
+      throw new ApiError(500, "Avatar upload failed");
+    }
+
+    avatarUrl = avatar.secure_url;
+  }
+
+  // 6. Create user
   const user = await User.create({
     fullName,
     username,
     email,
     password,
     phoneNumber,
-    // avatar: avatar.secure_url,
+    avatar: avatarUrl,
   });
 
-  // 6. Fetch created user without sensitive fields
+  // 7. Fetch created user without sensitive fields
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken",
   );
@@ -58,10 +65,94 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Something went wrong while creating a user");
   }
 
-  // 7. Send response
+  // 8. Send response
   return res
     .status(201)
-    .json(new ApiResponse(201, createdUser, "User registered successfully"));
+    .json(
+      new ApiResponse(
+        201,
+        createdUser,
+        "User registered successfully",
+      ),
+    );
 });
 
-export { registerUser };
+
+const loginUser = asyncHandler(async (req, res) => {
+  const { username, email, password } = req.body ?? {};
+
+  // Validate required fields
+  if ((!username && !email) || !password) {
+    throw new ApiError(
+      400,
+      "Username or email and password are required",
+    );
+  }
+
+  // Find user using username or email
+  const conditions = [];
+
+  if (username?.trim()) {
+    conditions.push({ username: username.trim().toLowerCase() });
+  }
+
+  if (email?.trim()) {
+    conditions.push({ email: email.trim().toLowerCase() });
+  }
+
+  const user = await User.findOne({
+    $or: conditions,
+  }).select("+password +refreshToken");
+
+  if (!user) {
+    throw new ApiError(401, "Invalid username/email or password");
+  }
+
+  // Verify password
+  const isPasswordValid = await user.isPasswordCorrect(password);
+
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid username/email or password");
+  }
+
+  // Generate access and refresh tokens
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+
+  // Save refresh token in database
+  user.refreshToken = refreshToken;
+
+  await user.save({
+    validateBeforeSave: false,
+  });
+
+  // Get user details without password and refresh token
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
+
+  // Cookie options
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  };
+
+  // Send response with cookies
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+        },
+        "User logged in successfully",
+      ),
+    );
+});
+
+
+export { registerUser, loginUser };

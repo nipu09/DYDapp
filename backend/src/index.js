@@ -1,10 +1,12 @@
 import dotenv from "dotenv";
-import connectDB from "./db/connectDB.js";
-import {app}from "./app.js";
 
 dotenv.config({
   path: "./.env",
 });
+
+// Import modules after loading environment variables
+const { default: connectDB } = await import("./db/connectDB.js");
+const { app } = await import("./app.js");
 
 connectDB()
   .then(() => {
