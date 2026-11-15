@@ -7,6 +7,15 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+
+function extractPublicId(imageUrl) {
+  // Matches everything after '/upload/' (skipping transformations and version numbers like v1712345678/)
+  // up to the file extension
+  const regex = /\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?(.+?)\.[^.]+$/;
+  const match = imageUrl.match(regex);
+  return match ? match[1] : null;
+}
+
 const uploadOnCloudinary = async (localFilePath) => {
   try {
     if (!localFilePath) return null;
@@ -36,4 +45,20 @@ const uploadOnCloudinary = async (localFilePath) => {
   }
 };
 
-export { uploadOnCloudinary };
+const deleteOnCloudinary = async (imageUrl) => {
+  try {
+    const publicId = extractPublicId(imageUrl);
+
+    if (!publicId) {
+      throw new Error('Could not extract a valid public_id from the provided URL.');
+    }
+
+    const result = await cloudinary.uploader.destroy(publicId, { invalidate: true });
+    console.log(`Deleted (${publicId}):`, result); // { result: 'ok' }
+    return result;
+  } catch (error) {
+    console.error('Error deleting image by URL:', error);
+    throw error;
+  }
+}
+export { uploadOnCloudinary, deleteOnCloudinary };

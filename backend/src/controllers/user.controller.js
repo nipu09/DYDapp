@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { clear } from "console";
 
@@ -271,9 +271,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
   );
 });
 
-
 //..................Update>....................................
-
 
 // Change Current Password
 const changeCurrentPassword = asyncHandler(async (req, res) => {
@@ -306,12 +304,17 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Avatar file is missing");
   }
 
+  // Upload new avatar
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
   if (!avatar?.url) {
     throw new ApiError(400, "Error while uploading avatar. Try again");
   }
 
+  // Get old avatar URL
+  const userOldAvatarUrl = req.user?.avatar;
+
+  // Update user avatar
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
@@ -320,12 +323,17 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
       },
     },
     {
-      new: true,
+      returnDocument: "after",
     },
   ).select("-password -refreshToken");
 
   if (!user) {
     throw new ApiError(404, "User not found");
+  }
+
+  // Delete old avatar if it exists
+  if (userOldAvatarUrl) {
+    await deleteOnCloudinary(userOldAvatarUrl);
   }
 
   return res
