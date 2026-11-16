@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", sans-serif;
+  --font-display: Manrope, sans-serif;
+  --font-serif: Georgia, serif;
+
+  --color-ink: #181818;
+  --color-panel: #252525;
+  --color-lime: #d8ff54;
+  --color-grape: #c575f8;
+
+  /* looping yellow strip on the landing page */
+  --animate-marquee: marquee 25s linear infinite;
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+}
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    background: #181818;
+    color: #f8f8f5;
+    font-family: "DM Sans", sans-serif;
+    text-rendering: optimizeLegibility;
+    font-synthesis: none;
+  }
+}

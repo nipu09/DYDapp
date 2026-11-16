@@ -3,7 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { clear } from "console";
+import { clear, log } from "console";
 
 // Generate Access Token and Refresh Token
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -250,8 +250,8 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     );
 });
 
-// GET CURRENT USER DETAILS
-const getCurrentUser = asyncHandler(async (req, res) => {
+// GET USER DETAILS
+const userDetails = asyncHandler(async (req, res) => {
   const user = req.user;
 
   return res.status(200).json(
@@ -347,6 +347,6 @@ export {
   logoutUser,
   refreshAccessToken,
   changeCurrentPassword,
-  getCurrentUser,
+  userDetails,
   updateUserAvatar,
 };
