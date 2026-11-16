@@ -5,7 +5,10 @@ import cookieParser from "cookie-parser";
 
 import userRouter from "./routes/user.routes.js";
 import habitRouter from "./routes/habit.routes.js";
-
+import habitLogRouter from "./routes/habitLog.routes.js";
+import dashboardRouter from "./routes/dashboard.routes.js";
+import analyticsRouter from "./routes/analytics.routes.js";
+import aiRouter from "./routes/ai.routes.js";
 const app = express();
 
 // CORS configuration
@@ -25,7 +28,10 @@ app.use(cookieParser());
 // Routes
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/habit", habitRouter);
-
+app.use("/api/v1/", habitLogRouter);
+app.use("/api/v1/dashboard", dashboardRouter);
+app.use("/api/v1/analytics", analyticsRouter);
+app.use("/api/v1/ai", aiRouter);
 
 // 404 Handler
 app.use((req, res, next) => {
