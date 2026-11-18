@@ -147,7 +147,7 @@ const loginUser = asyncHandler(async (req, res) => {
   const options = {
     httpOnly: true,
     secure: true,
-    sameSite: "strict",
+    sameSite: "lax",
   };
 
   // 8. Send response
@@ -160,8 +160,10 @@ const loginUser = asyncHandler(async (req, res) => {
         200,
         {
           user: loggedInUser,
-          accessToken,
-          refreshToken,
+          
+          // accessToken,refreshToken
+        
+        
         },
         "User logged in successfully",
       ),

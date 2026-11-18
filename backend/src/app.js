@@ -1,4 +1,3 @@
-
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -9,15 +8,17 @@ import habitLogRouter from "./routes/habitLog.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import analyticsRouter from "./routes/analytics.routes.js";
 import aiRouter from "./routes/ai.routes.js";
+
 const app = express();
 
-// CORS configuration
-app.use(
-    cors({
-        origin: process.env.CORS_ORIGIN,
-        credentials: true,
-    })
-);
+const corsOptions = {
+  origin: "http://localhost:5173",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
 
 // Middleware
 app.use(express.json({ limit: "16kb" }));
@@ -35,24 +36,21 @@ app.use("/api/v1/ai", aiRouter);
 
 // 404 Handler
 app.use((req, res, next) => {
-    res.status(404).json({
-        success: false,
-        message: `Route not found: ${req.method} ${req.originalUrl}`,
-    });
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
 });
 
-// Global JSON Error Handler
+// Global Error Handler
 app.use((err, req, res, next) => {
-    const statusCode = err.statusCode || err.status || 500;
+  const statusCode = err.statusCode || err.status || 500;
 
-    res.status(statusCode).json({
-        success: false,
-        message: err.message || "Internal Server Error",
-        errors: err.errors || [],
-    });
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    errors: err.errors || [],
+  });
 });
-
-
-
 
 export { app };

@@ -1,49 +1,62 @@
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
-export const generateHabitReport = async (habitStats) => {
-  const maxRetries = 3;
+export const generateHabitReport = async (habitData) => {
+  try {
+    console.log("Calling Groq AI...");
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`Gemini request: attempt ${attempt}`);
+    const completion = await groq.chat.completions.create({
+     model: "openai/gpt-oss-120b",
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: JSON.stringify(habitStats),
-        config: {
-          systemInstruction: `
-            You are a supportive AI Habit Coach.
+      messages: [
+        {
+          role: "system",
+          content: `
+            You are Aadat AI, a friendly and intelligent habit coach.
 
-            Return ONLY valid JSON:
+            Analyze the user's weekly habit performance.
+
+            Provide:
+            1. A short weekly report.
+            2. Strengths.
+            3. Areas for improvement.
+            4. Actionable suggestions.
+
+            Be encouraging, practical and concise.
+
+            Return ONLY valid JSON in this exact format:
+
             {
-              "report": "Short weekly summary",
-              "strengths": ["strength 1"],
-              "improvements": ["improvement 1"],
-              "suggestions": ["suggestion 1"]
+              "report": "string",
+              "strengths": ["string"],
+              "improvements": ["string"],
+              "suggestions": ["string"]
             }
-
-            Be encouraging, practical, and use actual statistics.
           `,
-          responseMimeType: "application/json",
         },
-      });
+        {
+          role: "user",
+          content: JSON.stringify(habitData),
+        },
+      ],
 
-      return JSON.parse(response.text);
+      temperature: 0.7,
+      max_completion_tokens: 1000,
 
-    } catch (error) {
-      console.error(`Gemini attempt ${attempt} failed:`, error.message);
+      response_format: {
+        type: "json_object",
+      },
+    });
 
-      if (attempt === maxRetries) {
-        throw error;
-      }
+    const content = completion.choices[0].message.content;
 
-      await new Promise((resolve) =>
-        setTimeout(resolve, attempt * 2000)
-      );
-    }
+    return JSON.parse(content);
+
+  } catch (error) {
+    console.error("Groq AI Error:", error.message);
+    throw error;
   }
 };

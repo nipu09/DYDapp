@@ -160,8 +160,6 @@ export const getWeeklyHabitReport = asyncHandler(
       habits: habitStats,
     };
 
-
-    console.log("Calling Gemini with habit statistics...");
     // Generate AI report
     const report = await generateHabitReport(aiInput);
 
