@@ -206,4 +206,80 @@ const getTodayList = asyncHandler(async (req, res) => {
   });
 });
 
-export { setLog, getTodayList };
+
+
+// GET HABIT HISTORY (for heat map)
+const getHabitHistory = asyncHandler(async (req, res) => {
+  const { habitId } = req.params;
+
+  const { year } = req.query;
+
+  // 1. Find authenticated user
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(401, "Unauthorized user");
+  }
+
+  // 2. Check habit ownership
+  const habit = await Habit.findOne({
+    _id: habitId,
+    userId: user._id,
+  });
+
+  if (!habit) {
+    throw new ApiError(404, "Habit not found");
+  }
+
+  // 3. Determine year
+  const selectedYear = Number(year) || new Date().getFullYear();
+
+  if (
+    !Number.isInteger(selectedYear) ||
+    selectedYear < 2000 ||
+    selectedYear > 2100
+  ) {
+    throw new ApiError(400, "Invalid year");
+  }
+
+  // 4. Define date range
+  const startDate = `${selectedYear}-01-01`;
+  const endDate = `${selectedYear}-12-31`;
+
+  // 5. Fetch habit logs
+  const logs = await HabitLog.find({
+    userId: user._id,
+    habitId: habit._id,
+    date: {
+      $gte: startDate,
+      $lte: endDate,
+    },
+  }).sort({ date: 1 });
+
+  // 6. Calculate statistics
+  const totalCompleted = calculateTotalCompleted(logs);
+
+  const totalLogged = logs.length;
+
+  const completionRate = totalLogged
+    ? Math.round((totalCompleted / totalLogged) * 100)
+    : 0;
+
+  // 7. Send response
+  return res.status(200).json({
+    success: true,
+    message: "Habit history fetched successfully",
+    data: {
+      habit,
+      year: selectedYear,
+      stats: {
+        totalCompleted,
+        totalLogged,
+        completionRate,
+      },
+      logs,
+    },
+  });
+});
+
+export { setLog, getTodayList, getHabitHistory };
