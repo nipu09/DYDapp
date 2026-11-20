@@ -14,12 +14,6 @@ const habitStreakSchema = new Schema(
       required: true,
     },
 
-    currentStreak: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
     longestStreak: {
       type: Number,
       default: 0,
@@ -39,10 +33,15 @@ const habitStreakSchema = new Schema(
   },
   {
     timestamps: true,
-  },
+  }
 );
 
-// One streak document per habit
-habitStreakSchema.index({ habitId: 1 }, { unique: true });
+habitStreakSchema.index(
+  { userId: 1, habitId: 1 },
+  { unique: true }
+);
 
-export const HabitStreak = mongoose.model("HabitStreak", habitStreakSchema);
+export const HabitStreak = mongoose.model(
+  "HabitStreak",
+  habitStreakSchema
+);

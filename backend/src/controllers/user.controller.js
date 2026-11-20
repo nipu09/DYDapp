@@ -130,13 +130,11 @@ const loginUser = asyncHandler(async (req, res) => {
   const isPasswordValid = await existingUser.isPasswordCorrect(password);
 
   if (!isPasswordValid) {
-    throw new ApiError(401, "No user found");
+    throw new ApiError(401, "No user found/ password wrong");
   }
 
   // 5. Generate tokens
-  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-    existingUser._id,
-  );
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens( existingUser._id, );
 
   // 6. Get user without sensitive information
   const loggedInUser = await User.findById(existingUser._id).select(
@@ -146,7 +144,7 @@ const loginUser = asyncHandler(async (req, res) => {
   // 7. Cookie options
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
   };
 
@@ -160,10 +158,8 @@ const loginUser = asyncHandler(async (req, res) => {
         200,
         {
           user: loggedInUser,
-          
+
           // accessToken,refreshToken
-        
-        
         },
         "User logged in successfully",
       ),
@@ -186,7 +182,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
   };
 
@@ -232,7 +228,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
   };
 
@@ -278,51 +274,52 @@ const userDetails = asyncHandler(async (req, res) => {
 // Change Current Password
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
-    const { oldPassword, newPassword } = req.body;
+  const { oldPassword, newPassword } = req.body;
 
-    // Validate input
-    if (!oldPassword || !newPassword) {
-        throw new ApiError(400, "Old password and new password are required");
-    }
+  // Validate input
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(400, "Old password and new password are required");
+  }
 
-    // Validate new password
-    if (newPassword.length < 8) {
-        throw new ApiError(400, "New password must be at least 8 characters long");
-    }
+  // Validate new password
+  if (newPassword.length < 8) {
+    throw new ApiError(400, "New password must be at least 8 characters long");
+  }
 
-    // Find user
-    const user = await User.findById(req.user._id ?? req.user.id);
+  // Find user
+  const user = await User.findById(req.user._id ?? req.user.id);
 
-    if (!user) {
-        throw new ApiError(404, "User not found");
-    }
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
 
-    // Check old password
-    const checkPassword = await user.isPasswordCorrect(oldPassword);
+  // Check old password
+  const checkPassword = await user.isPasswordCorrect(oldPassword);
 
-    if (!checkPassword) {
-        throw new ApiError(400, "Invalid old password");
-    }
+  if (!checkPassword) {
+    throw new ApiError(400, "Invalid old password");
+  }
 
-    // Prevent using the same password
-    if (oldPassword === newPassword) {
-        throw new ApiError(400, "New password must be different from old password");
-    }
+  // Prevent using the same password
+  if (oldPassword === newPassword) {
+    throw new ApiError(400, "New password must be different from old password");
+  }
 
-    // Update password
-    user.password = newPassword;
+  // Update password
+  user.password = newPassword;
 
-    // Clear stored refresh token (logout other devices)
-    user.refreshToken = undefined;
+  // Clear stored refresh token (logout other devices)
+  user.refreshToken = undefined;
 
-    // Save with schema validation enabled
-    await user.save();
+  // Save with schema validation enabled
+  await user.save();
 
-    return res.status(200).json(
-        new ApiResponse(200, {}, "Password changed successfully. Please log in.")
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, {}, "Password changed successfully. Please log in."),
     );
 });
-
 
 //UPDATE USER AVATAR
 const updateUserAvatar = asyncHandler(async (req, res) => {
@@ -369,6 +366,28 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "Avatar updated successfully"));
 });
 
+
+// to beDONE
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email, username, phoneNumber } = req.body;
+
+  if ((email || username || phoneNumber).trim() == "") {
+    throw new ApiError(401, "email / username / phoneNumber is required ");
+  }
+  const existiingUser = await User.findOne({
+    $or: [email, username, phonenumber],
+  });
+
+  if (!existiingUser) {
+    throw new ApiError(400, " Account don't exist")
+  }
+
+
+
+
+
+});
+
 export {
   registerUser,
   loginUser,
@@ -377,4 +396,5 @@ export {
   changeCurrentPassword,
   userDetails,
   updateUserAvatar,
+  forgotPassword,
 };

@@ -17,7 +17,23 @@ const habitLogSchema = new Schema(
     date: {
       type: String,
       required: true,
-      match: /^\d{4}-\d{2}-\d{2}$/,
+      validate: {
+        validator: (value) => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            return false;
+          }
+
+          const parsedDate = new Date(
+            `${value}T00:00:00.000Z`,
+          );
+
+          return (
+            !Number.isNaN(parsedDate.getTime()) &&
+            parsedDate.toISOString().slice(0, 10) === value
+          );
+        },
+        message: "Invalid calendar date. Use YYYY-MM-DD.",
+      },
     },
 
     status: {
@@ -48,10 +64,22 @@ const habitLogSchema = new Schema(
   },
 );
 
-// One log per habit per day
-habitLogSchema.index({ habitId: 1, date: 1 }, { unique: true });
+
+// One log per user, per habit, per day
+habitLogSchema.index(
+  { userId: 1, habitId: 1, date: 1 },
+  { unique: true },
+);
+
 
 // Heatmap queries
-habitLogSchema.index({ userId: 1, date: 1 });
+habitLogSchema.index({
+  userId: 1,
+  date: 1,
+});
 
-export const HabitLog = mongoose.model("HabitLog", habitLogSchema);
+
+export const HabitLog = mongoose.model(
+  "HabitLog",
+  habitLogSchema,
+);

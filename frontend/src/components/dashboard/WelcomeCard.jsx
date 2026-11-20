@@ -1,8 +1,31 @@
 
-import React from "react";
 import { Sparkles, Sun } from "lucide-react";
+import { getCurrentUser } from "../../api/auth";
+import { useState, useEffect } from "react";
 
 const WelcomeCard = ({ name = "there" }) => {
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("User");
+
+  // FETCH CURRENT USER
+  useEffect(() => {
+    const fetchUserName = async () => {
+      try {
+        const response = await getCurrentUser();
+
+        setUserName(response.data?.username || name);
+
+      } catch (error) {
+        console.error("Failed to fetch username:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserName();
+  }, [name]);
+
+  // CURRENT DATE
   const today = new Date();
 
   const date = today.toLocaleDateString("en-US", {
@@ -19,23 +42,25 @@ const WelcomeCard = ({ name = "there" }) => {
 
       {/* UPPER SECTION - GREETING */}
       <div className="relative z-10">
+
         <div className="mb-4 flex items-center gap-3 text-sm font-semibold text-lime">
           <Sun size={22} />
           <span>{date}</span>
         </div>
 
         <h1 className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-          Hey, {name}
-          <span className="text-lime">!</span>
+          Hey, {loading ? "..." : userName}
         </h1>
 
         <p className="mt-2 text-sm text-white/40">
           Welcome back. Let's make today count.
         </p>
+
       </div>
 
       {/* LOWER SECTION - MOTIVATION QUOTE */}
       <div className="relative z-10 border-t border-white/10 pt-5">
+
         <div className="mb-3 flex items-center gap-2">
           <Sparkles size={17} className="text-grape" />
 
@@ -49,6 +74,7 @@ const WelcomeCard = ({ name = "there" }) => {
         </p>
 
         <div className="mt-3 h-1 w-12 rounded-full bg-lime" />
+
       </div>
 
     </section>

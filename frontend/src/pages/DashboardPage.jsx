@@ -5,8 +5,11 @@ import HeatmapSection from "../components/dashboard/HeatmapSection";
 import WelcomeCard from "../components/dashboard/WelcomeCard";
 import ProgressCircle from "../components/dashboard/ProgressCircle";
 import TopStreaks from "../components/dashboard/TopStreak";
+import { useState } from "react";
 
 const Dashboard = () => {
+
+
   return (
     <div className="min-h-screen bg-ink">
 

@@ -14,7 +14,7 @@ export const loginUser = async (credentials) => {
   return response.data;
 };
 
-// Get logged-in user
+// Get profile 
 export const getCurrentUser = async () => {
   const response = await API.get("/users/me");
   return response.data;

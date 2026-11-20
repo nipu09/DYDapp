@@ -1,23 +1,23 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 
 import { User } from "../models/user.model.js";
 import { Habit } from "../models/habit.model.js";
 import { HabitLog } from "../models/habitLog.model.js";
+import { HabitStreak } from "../models/habitStreak.model.js";
 
 import { todayIn, isValidDate } from "../utils/dateUtils.js";
 import { isScheduled } from "../utils/habitSchedule.js";
 
 import {
   calculateCurrentStreak,
-  calculateLongestStreak,
   calculateTotalCompleted,
 } from "../utils/streakUtils.js";
 
-// ========================================
-// SET HABIT LOG
-// ========================================
+import { syncHabitStreak } from "../services/streak.service.js";
 
+// SET HABIT LOG
 const setLog = asyncHandler(async (req, res) => {
   const { habitId, date } = req.params;
   const { status, note } = req.body;
@@ -29,7 +29,7 @@ const setLog = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Unauthorized user");
   }
 
-  // 2. Get today's date
+  // 2. Get today's date according to user's timezone
   const today = todayIn(user.timezone || "Asia/Kolkata");
 
   // 3. Validate date
@@ -42,7 +42,7 @@ const setLog = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Cannot log future dates");
   }
 
-  // 5. Allow only today and previous 2 days (3 calendar days total)
+  // 5. Allow today and previous two days
   const oldestDate = new Date(`${today}T00:00:00.000Z`);
 
   oldestDate.setUTCDate(oldestDate.getUTCDate() - 2);
@@ -62,26 +62,30 @@ const setLog = asyncHandler(async (req, res) => {
   const habit = await Habit.findOne({
     _id: habitId,
     userId: user._id,
+    isArchived: false,
   });
 
   if (!habit) {
     throw new ApiError(404, "Habit not found");
   }
 
-  // 8. Check schedule
+  // 8. Check whether habit is scheduled
   if (!isScheduled(habit, date)) {
     throw new ApiError(400, "Habit is not scheduled for this date");
   }
 
-  // 9. Create or update log
+  // 9. Create or update habit log
   const log = await HabitLog.findOneAndUpdate(
     {
+      userId: user._id,
       habitId: habit._id,
       date,
     },
     {
       $set: {
         userId: user._id,
+        habitId: habit._id,
+        date,
         status,
         completedAt: status === "done" ? new Date() : null,
         note: note || "",
@@ -93,85 +97,93 @@ const setLog = asyncHandler(async (req, res) => {
       upsert: true,
       runValidators: true,
       setDefaultsOnInsert: true,
-    },
+    }
   );
 
-  return res.status(200).json({
-    success: true,
-    message: "Habit log updated successfully",
-    data: log,
-  });
+  // 10. Synchronize cached streak statistics
+  const streak = await syncHabitStreak(habit, today);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        log,
+        streak,
+      },
+      "Habit log updated successfully"
+    )
+  );
 });
 
-// ========================================
-// GET TODAY'S HABIT LIST WITH STREAKS
-// ========================================
 
+// GET TODAY'S HABIT LIST WITH STREAKS
 const getTodayList = asyncHandler(async (req, res) => {
   // 1. Find authenticated user
-  const authenticatedUser = await User.findById(req.user._id);
+  const user = await User.findById(req.user._id);
 
-  if (!authenticatedUser) {
+  if (!user) {
     throw new ApiError(401, "Unauthorized user");
   }
 
-  // 2. Calculate today
-  const today = todayIn(
-    authenticatedUser.timezone || "Asia/Kolkata",
-  );
+  // 2. Get today's date
+  const today = todayIn(user.timezone || "Asia/Kolkata");
 
-  // 3. Find user's active habits
+  // 3. Find active, non-archived habits
   const userHabits = await Habit.find({
-    userId: authenticatedUser._id,
+    userId: user._id,
     isActive: true,
     isArchived: false,
   });
 
   // 4. Filter habits scheduled for today
   const todayHabits = userHabits.filter((habit) =>
-    isScheduled(habit, today),
+    isScheduled(habit, today)
   );
 
-  // 5. Get IDs of today's habits
+  // 5. Fetch logs for today's habits
   const habitIds = todayHabits.map((habit) => habit._id);
 
-  // 6. Fetch historical logs for these habits
   const logs = await HabitLog.find({
-    userId: authenticatedUser._id,
+    userId: user._id,
     habitId: { $in: habitIds },
     date: { $lte: today },
   }).sort({ date: 1 });
 
-  // 7. Combine habits, today's status and streak information
+  // 6. Fetch cached streak statistics
+  const streaks = await HabitStreak.find({
+    userId: user._id,
+    habitId: { $in: habitIds },
+  });
+
+  const streakMap = new Map(
+    streaks.map((streak) => [
+      streak.habitId.toString(),
+      streak,
+    ])
+  );
+
+  // 7. Prepare habits with status and streaks
   const habitsWithStatus = todayHabits.map((habit) => {
-    // Find logs belonging to this particular habit
     const habitLogs = logs.filter(
       (log) =>
-        log.habitId.toString() === habit._id.toString(),
+        log.habitId.toString() === habit._id.toString()
     );
 
-    // Find today's log
     const todayLog = habitLogs.find(
-      (log) => log.date === today,
+      (log) => log.date === today
     );
 
-    const status = todayLog ? todayLog.status : null;
+    const status = todayLog?.status || null;
 
-    // Calculate streak information
+    // Current streak is calculated dynamically
     const currentStreak = calculateCurrentStreak(
       habitLogs,
       habit,
-      today,
+      today
     );
 
-    const longestStreak = calculateLongestStreak(
-      habitLogs,
-      habit,
-      today,
-    );
-
-    const totalCompleted = calculateTotalCompleted(
-      habitLogs,
+    const cachedStreak = streakMap.get(
+      habit._id.toString()
     );
 
     return {
@@ -181,37 +193,44 @@ const getTodayList = asyncHandler(async (req, res) => {
 
       streaks: {
         current: currentStreak,
-        longest: longestStreak,
-        totalCompleted,
+        longest: cachedStreak?.longestStreak ?? 0,
+        totalCompleted: cachedStreak?.totalCompletions ??
+          calculateTotalCompleted(habitLogs),
       },
     };
   });
 
-  // 8. Calculate today's completed habits
+  // 8. Calculate today's progress
   const done = habitsWithStatus.filter(
-    (habit) => habit.done,
+    (habit) => habit.done
   ).length;
 
-  // 9. Calculate total habits
   const total = habitsWithStatus.length;
 
-  // 10. Send response
-  return res.status(200).json({
-    success: true,
-    message: "Today's habits fetched successfully",
-    date: today,
-    done,
-    total,
-    habits: habitsWithStatus,
-  });
+  const completionRate = total
+    ? Math.round((done / total) * 100)
+    : 0;
+
+  // 9. Return response
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        date: today,
+        done,
+        total,
+        completionRate,
+        habits: habitsWithStatus,
+      },
+      "Today's habits fetched successfully"
+    )
+  );
 });
 
 
-
-// GET HABIT HISTORY (for heat map)
+// GET HABIT HISTORY
 const getHabitHistory = asyncHandler(async (req, res) => {
   const { habitId } = req.params;
-
   const { year } = req.query;
 
   // 1. Find authenticated user
@@ -232,7 +251,9 @@ const getHabitHistory = asyncHandler(async (req, res) => {
   }
 
   // 3. Determine year
-  const selectedYear = Number(year) || new Date().getFullYear();
+  const selectedYear = year === undefined
+    ? Number(todayIn(user.timezone || "Asia/Kolkata").slice(0, 4))
+    : Number(year);
 
   if (
     !Number.isInteger(selectedYear) ||
@@ -265,21 +286,27 @@ const getHabitHistory = asyncHandler(async (req, res) => {
     ? Math.round((totalCompleted / totalLogged) * 100)
     : 0;
 
-  // 7. Send response
-  return res.status(200).json({
-    success: true,
-    message: "Habit history fetched successfully",
-    data: {
-      habit,
-      year: selectedYear,
-      stats: {
-        totalCompleted,
-        totalLogged,
-        completionRate,
+  // 7. Return response
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        habit,
+        year: selectedYear,
+        stats: {
+          totalCompleted,
+          totalLogged,
+          completionRate,
+        },
+        logs,
       },
-      logs,
-    },
-  });
+      "Habit history fetched successfully"
+    )
+  );
 });
 
-export { setLog, getTodayList, getHabitHistory };
+export {
+  setLog,
+  getTodayList,
+  getHabitHistory,
+};

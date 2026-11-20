@@ -1,30 +1,50 @@
-
-import { weekdayOf } from "./dateUtils.js";
+import { weekdayOf, isValidDate } from "./dateUtils.js";
 
 export const isScheduled = (habit, dateString) => {
-
-  // 1. Check start date
-  if (dateString < habit.startDate) {
+  if (!habit || !isValidDate(dateString)) {
     return false;
   }
 
-  // 2. Check end date
-  if (habit.endDate && dateString > habit.endDate) {
+  // Check start date
+  if (
+    !habit.startDate ||
+    !isValidDate(habit.startDate) ||
+    dateString < habit.startDate
+  ) {
     return false;
   }
 
-  // 3. Check archive date
-  if (habit.archivedAt && dateString > habit.archivedAt) {
+  // Check end date
+  if (
+    habit.endDate &&
+    dateString > habit.endDate
+  ) {
     return false;
   }
 
-  // 4. Daily frequency
+  // Check archive date (only if available)
+  // Historical dates before archiving remain valid.
+  if (
+    habit.archivedAt &&
+    dateString > habit.archivedAt
+  ) {
+    return false;
+  }
+
+  // Daily frequency
   if (habit.frequency === "daily") {
     return true;
   }
 
-  // 5. Weekly frequency
-  const weekday = weekdayOf(dateString);
+  // Weekly frequency
+  if (habit.frequency === "weekly") {
+    const weekday = weekdayOf(dateString);
 
-  return habit.daysOfWeek.includes(weekday);
+    return (
+      Array.isArray(habit.daysOfWeek) &&
+      habit.daysOfWeek.includes(weekday)
+    );
+  }
+
+  return false;
 };

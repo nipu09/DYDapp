@@ -1,15 +1,31 @@
 import { Router } from "express";
-import { verifyJWT } from "../middlewares/auth.middleware.js";
-import { getHabitHistory, getTodayList, setLog } from "../controllers/habitLog.controller.js";
 
+import { verifyJWT } from "../middlewares/auth.middleware.js";
+
+import {
+  getHabitHistory,
+  getTodayList,
+  setLog,
+} from "../controllers/habitLog.controller.js";
 
 const router = Router();
 
-// All routes require authentication
 router.use(verifyJWT);
 
-router.route("/habit/:habitId/logs/:date").put(setLog);
-router.route("/habit/today").get(getTodayList);
-router.route("/:habitId/history").get(getHabitHistory);
+
+// GET TODAY'S HABITS
+// GET /api/v1/habit-logs/today
+router.get("/today", getTodayList);
+
+
+// CREATE OR UPDATE DAILY LOG
+// PUT /api/v1/habit-logs/:habitId/:date
+router.put("/:habitId/:date", setLog);
+
+
+// GET HABIT HISTORY
+// GET /api/v1/habit-logs/:habitId/history
+router.get("/:habitId/history", getHabitHistory);
+
 
 export default router;

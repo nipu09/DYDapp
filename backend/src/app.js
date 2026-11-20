@@ -11,6 +11,8 @@ import aiRouter from "./routes/ai.routes.js";
 
 const app = express();
 
+
+// CORS CONFIGURATION
 const corsOptions = {
   origin: "http://localhost:5173",
   credentials: true,
@@ -20,29 +22,33 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Middleware
+
+// GLOBAL MIDDLEWARE
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
-// Routes
+
+// API ROUTES
 app.use("/api/v1/users", userRouter);
-app.use("/api/v1/habit", habitRouter);
-app.use("/api/v1/", habitLogRouter);
+app.use("/api/v1/habits", habitRouter);
+app.use("/api/v1/habit-logs", habitLogRouter);
 app.use("/api/v1/dashboard", dashboardRouter);
 app.use("/api/v1/analytics", analyticsRouter);
 app.use("/api/v1/ai", aiRouter);
 
-// 404 Handler
-app.use((req, res, next) => {
+
+// 404 HANDLER
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: `Route not found: ${req.method} ${req.originalUrl}`,
   });
 });
 
-// Global Error Handler
+
+// GLOBAL ERROR HANDLER
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || err.status || 500;
 
